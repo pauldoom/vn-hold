@@ -1,0 +1,50 @@
+default:
+  image: registry.gitlab.com/pages/hugo/hugo:latest
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  # Don't add a leading / here unless you want a key named "/" with
+  # a subkey named "/public"...
+  SUBFOLDER: waiting_room
+
+  # Remianing items should be defined in project variables
+  AWS_ACCESS_KEY_ID: setme
+  AWS_SECRET_ACCESS_KEY: setme
+  S3_ENDPOINT: setme
+  S3_BUCKET: setme
+
+
+stages:
+  - test
+  - render
+  - sync
+
+test:
+  stage: test
+  script:
+  - hugo
+  except:
+  - main
+
+render:
+  stage: render
+  script:
+  - hugo
+  artifacts:
+    paths:
+    - public
+  only:
+  - main
+
+sync:
+  stage: sync
+  image: amazon/aws-cli:latest
+  script:
+    - aws s3 sync public s3://$S3_BUCKET/$SUBFOLDER --acl=public-read --no-paginate --output=json --endpoint=https://$S3_ENDPOINT
+    - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+  needs:
+    - job: render
+      artifacts: true
+  only:
+  - main
+
