@@ -1,5 +1,5 @@
 default:
-  image: registry.gitlab.com/pages/hugo/hugo:latest
+  image: registry.gitlab.com/pages/hugo/hugo_extended:latest
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
@@ -29,7 +29,8 @@ test:
 render:
   stage: render
   script:
-  - hugo
+  # This site lives in a subfolder
+  - hugo --baseUrl="/${SUBFOLDER}"
   artifacts:
     paths:
     - public
@@ -40,7 +41,8 @@ sync:
   stage: sync
   image: amazon/aws-cli:latest
   script:
-    - aws s3 sync public s3://$S3_BUCKET/$SUBFOLDER --acl=public-read --no-paginate --output=json --endpoint=https://$S3_ENDPOINT
+    # Copy into a nested subfolder to make CloudFront happy
+    - aws s3 sync public s3://$S3_BUCKET/$SUBFOLDER/$SUBFOLDER --acl=public-read --no-paginate --output=json --endpoint=https://$S3_ENDPOINT
     - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
   needs:
     - job: render
